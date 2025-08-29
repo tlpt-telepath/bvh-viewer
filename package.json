@@ -1,0 +1,17 @@
+{
+  "name": "bvh-viewer",
+  "version": "1.0.0",
+  "description": "A web-based BVH file viewer using Three.js",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^4.4.9"
+  },
+  "dependencies": {
+    "three": "^0.156.1"
+  }
+}

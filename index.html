@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BVH Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #2a2a2a;
+            padding: 20px;
+            border-right: 1px solid #444;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .upload-area {
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .upload-area:hover {
+            border-color: #777;
+        }
+
+        .upload-area.dragover {
+            border-color: #4a90e2;
+            background: rgba(74, 144, 226, 0.1);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .controls {
+            margin-top: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        button {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background: #357abd;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .viewer {
+            flex: 1;
+            position: relative;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>BVH Viewer</h1>
+            
+            <div class="upload-area" id="uploadArea">
+                <p>BVHファイルをドラッグ&ドロップ<br>または<br>クリックして選択</p>
+                <input type="file" id="fileInput" accept=".bvh" />
+            </div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <button id="playBtn" disabled>再生</button>
+                    <button id="pauseBtn" disabled>一時停止</button>
+                    <button id="resetBtn" disabled>リセット</button>
+                </div>
+                
+                <div class="control-group">
+                    <label for="speedControl">再生速度: <span id="speedValue">1.0</span>x</label>
+                    <input type="range" id="speedControl" min="0.1" max="3" step="0.1" value="1" disabled />
+                </div>
+            </div>
+        </div>
+
+        <div class="viewer">
+            <canvas id="canvas"></canvas>
+            <div class="info">
+                <div>マウスドラッグで回転</div>
+                <div>ホイールでズーム</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
