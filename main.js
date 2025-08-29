@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 
 class BVHParser {
     parse(content) {
@@ -152,29 +155,46 @@ class BVHParser {
     }
 }
 
-class BVHViewer {
+class ModelViewer {
     constructor() {
         this.scene = null;
         this.camera = null;
         this.renderer = null;
         this.controls = null;
+        
+        // BVH関連
         this.skeleton = null;
         this.skeletonHelper = null;
         this.motionData = null;
         this.totalChannels = 0;
-        this.isPlaying = false;
-        this.currentFrame = 0;
-        this.playSpeed = 1.0;
         this.bones = new Map();
         this.frameObjects = [];
         this.boneConnections = [];
         this.skeletonGroup = null;
         this.skeletonScale = 1;
+        
+        // アニメーション関連
+        this.isPlaying = false;
+        this.currentFrame = 0;
+        this.playSpeed = 1.0;
         this.lastFrameTime = 0;
         this.frameAccumulator = 0;
+        this.mixer = null;
+        
+        // 現在のモデル
+        this.currentModel = null;
+        this.currentModelType = null;
+        
+        // ローダー
+        this.fbxLoader = new FBXLoader();
+        this.gltfLoader = new GLTFLoader();
+        this.gltfLoader.register((parser) => {
+            return new VRMLoaderPlugin(parser);
+        });
         
         this.init();
         this.setupEventListeners();
+        this.setupTabs();
     }
     
     init() {
@@ -196,15 +216,24 @@ class BVHViewer {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-        this.scene.add(ambientLight);
+        this.ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        this.scene.add(this.ambientLight);
         
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(50, 100, 50);
-        directionalLight.castShadow = true;
-        directionalLight.shadow.mapSize.width = 2048;
-        directionalLight.shadow.mapSize.height = 2048;
-        this.scene.add(directionalLight);
+        this.directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        this.directionalLight.position.set(50, 100, 50);
+        this.directionalLight.castShadow = true;
+        this.directionalLight.shadow.mapSize.width = 2048;
+        this.directionalLight.shadow.mapSize.height = 2048;
+        this.scene.add(this.directionalLight);
+        
+        // FBX/VRM用の追加ライト
+        this.fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        this.fillLight.position.set(-50, 50, -50);
+        this.scene.add(this.fillLight);
+        
+        this.backLight = new THREE.DirectionalLight(0xffffff, 0.2);
+        this.backLight.position.set(0, 50, -100);
+        this.scene.add(this.backLight);
         
         // Ground removed
         
@@ -284,39 +313,65 @@ class BVHViewer {
         });
     }
     
+    setupTabs() {
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // タブの切り替え
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${tabName}-content`).classList.add('active');
+                
+                // モデルをクリア
+                this.clearScene();
+            });
+        });
+    }
+    
     setupEventListeners() {
-        const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.getElementById('uploadArea');
+        const uploadAreas = document.querySelectorAll('.upload-area');
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const resetBtn = document.getElementById('resetBtn');
         const speedControl = document.getElementById('speedControl');
         const speedValue = document.getElementById('speedValue');
         
-        uploadArea.addEventListener('click', () => fileInput.click());
-        
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                this.loadBVHFile(files[0]);
-            }
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                this.loadBVHFile(e.target.files[0]);
-            }
+        // 各アップロードエリアにイベント設定
+        uploadAreas.forEach(uploadArea => {
+            const fileInput = uploadArea.querySelector('.file-input');
+            const fileType = uploadArea.dataset.type;
+            
+            uploadArea.addEventListener('click', () => fileInput.click());
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    this.loadFile(files[0], fileType);
+                }
+            });
+            
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    this.loadFile(e.target.files[0], fileType);
+                }
+            });
         });
         
         playBtn.addEventListener('click', () => this.play());
@@ -327,27 +382,256 @@ class BVHViewer {
             this.playSpeed = parseFloat(e.target.value);
             speedValue.textContent = this.playSpeed.toFixed(1);
         });
+        
+        // ライティング制御（FBX用）
+        const ambientIntensity = document.getElementById('ambientIntensity');
+        const ambientValue = document.getElementById('ambientValue');
+        const directionalIntensity = document.getElementById('directionalIntensity');
+        const directionalValue = document.getElementById('directionalValue');
+        
+        if (ambientIntensity) {
+            ambientIntensity.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.ambientLight.intensity = value;
+                ambientValue.textContent = value.toFixed(1);
+            });
+        }
+        
+        if (directionalIntensity) {
+            directionalIntensity.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.directionalLight.intensity = value;
+                this.fillLight.intensity = value * 0.4;
+                this.backLight.intensity = value * 0.3;
+                directionalValue.textContent = value.toFixed(1);
+            });
+        }
+        
+        // ライティング制御（VRM用）
+        const ambientIntensityVrm = document.getElementById('ambientIntensityVrm');
+        const ambientValueVrm = document.getElementById('ambientValueVrm');
+        const directionalIntensityVrm = document.getElementById('directionalIntensityVrm');
+        const directionalValueVrm = document.getElementById('directionalValueVrm');
+        
+        if (ambientIntensityVrm) {
+            ambientIntensityVrm.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.ambientLight.intensity = value;
+                ambientValueVrm.textContent = value.toFixed(1);
+            });
+        }
+        
+        if (directionalIntensityVrm) {
+            directionalIntensityVrm.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.directionalLight.intensity = value;
+                this.fillLight.intensity = value * 0.4;
+                this.backLight.intensity = value * 0.3;
+                directionalValueVrm.textContent = value.toFixed(1);
+            });
+        }
+    }
+    
+    async loadFile(file, fileType) {
+        this.clearScene();
+        
+        try {
+            switch (fileType) {
+                case 'bvh':
+                    await this.loadBVHFile(file);
+                    break;
+                case 'fbx':
+                    await this.loadFBXFile(file);
+                    break;
+                case 'vrm':
+                    await this.loadVRMFile(file);
+                    break;
+                default:
+                    throw new Error('Unsupported file type: ' + fileType);
+            }
+        } catch (error) {
+            console.error(`Error loading ${fileType.toUpperCase()} file:`, error);
+            alert(`${fileType.toUpperCase()}ファイルの読み込みに失敗しました: ` + error.message);
+        }
     }
     
     async loadBVHFile(file) {
-        try {
-            const content = await this.readFile(file);
-            const parser = new BVHParser();
-            const result = parser.parse(content);
-            
-            this.skeleton = result.skeleton;
-            this.motionData = result.motionData;
-            this.totalChannels = result.totalChannels;
-            
-            this.createSkeleton();
+        const content = await this.readFile(file);
+        const parser = new BVHParser();
+        const result = parser.parse(content);
+        
+        this.skeleton = result.skeleton;
+        this.motionData = result.motionData;
+        this.totalChannels = result.totalChannels;
+        this.currentModelType = 'bvh';
+        
+        this.createSkeleton();
+        this.enableControls();
+        
+        // BVH情報を表示
+        this.displayBVHInfo();
+        
+        const fps = (1.0 / this.motionData.frameTime).toFixed(1);
+        console.log(`BVH file loaded: ${this.motionData.frameCount} frames, ${this.totalChannels} channels, ${fps} FPS`);
+    }
+    
+    async loadFBXFile(file) {
+        const url = URL.createObjectURL(file);
+        const fbx = await new Promise((resolve, reject) => {
+            this.fbxLoader.load(url, resolve, undefined, reject);
+        });
+        
+        URL.revokeObjectURL(url);
+        
+        this.currentModel = fbx;
+        this.currentModelType = 'fbx';
+        this.scene.add(fbx);
+        
+        // FBX用ライティング強化
+        this.enhanceLightingForModels();
+        
+        // FBXアニメーション設定
+        if (fbx.animations && fbx.animations.length > 0) {
+            this.mixer = new THREE.AnimationMixer(fbx);
+            const action = this.mixer.clipAction(fbx.animations[0]);
+            action.play();
             this.enableControls();
-            
-            const fps = (1.0 / this.motionData.frameTime).toFixed(1);
-            console.log(`BVH file loaded: ${this.motionData.frameCount} frames, ${this.totalChannels} channels, ${fps} FPS`);
-        } catch (error) {
-            console.error('Error loading BVH file:', error);
-            alert('BVHファイルの読み込みに失敗しました: ' + error.message);
         }
+        
+        // モデルを適切にスケール・配置
+        this.normalizeModel(fbx);
+        
+        // ライティングコントロール表示
+        document.getElementById('fbx-lighting').style.display = 'block';
+        
+        console.log('FBX file loaded successfully');
+    }
+    
+    async loadVRMFile(file) {
+        const url = URL.createObjectURL(file);
+        const gltf = await new Promise((resolve, reject) => {
+            this.gltfLoader.load(url, resolve, undefined, reject);
+        });
+        
+        URL.revokeObjectURL(url);
+        
+        const vrm = gltf.userData.vrm;
+        if (vrm) {
+            VRMUtils.removeUnnecessaryVertices(gltf.scene);
+            VRMUtils.removeUnnecessaryJoints(gltf.scene);
+        }
+        
+        this.currentModel = gltf.scene;
+        this.currentModelType = 'vrm';
+        this.scene.add(gltf.scene);
+        
+        // VRM用ライティング強化
+        this.enhanceLightingForModels();
+        
+        // VRMアニメーション設定
+        if (gltf.animations && gltf.animations.length > 0) {
+            this.mixer = new THREE.AnimationMixer(gltf.scene);
+            const action = this.mixer.clipAction(gltf.animations[0]);
+            action.play();
+            this.enableControls();
+        }
+        
+        // モデルを適切にスケール・配置
+        this.normalizeModel(gltf.scene);
+        
+        // ライティングコントロール表示
+        document.getElementById('vrm-lighting').style.display = 'block';
+        
+        console.log('VRM file loaded successfully');
+    }
+    
+    enhanceLightingForModels() {
+        // FBX/VRM用により明るいライティングに調整
+        this.ambientLight.intensity = 1.2;
+        this.directionalLight.intensity = 1.5;
+        this.fillLight.intensity = 0.6;
+        this.backLight.intensity = 0.4;
+    }
+    
+    clearScene() {
+        // 既存のモデルを削除
+        if (this.skeletonGroup) {
+            this.scene.remove(this.skeletonGroup);
+            this.skeletonGroup = null;
+        }
+        
+        if (this.currentModel) {
+            this.scene.remove(this.currentModel);
+            this.currentModel = null;
+        }
+        
+        // BVH関連をリセット
+        this.frameObjects.forEach(obj => this.scene.remove(obj));
+        this.frameObjects = [];
+        this.bones.clear();
+        this.boneConnections = [];
+        
+        // アニメーション関連をリセット
+        if (this.mixer) {
+            this.mixer.stopAllAction();
+            this.mixer = null;
+        }
+        
+        this.isPlaying = false;
+        this.currentFrame = 0;
+        this.skeleton = null;
+        this.motionData = null;
+        this.currentModelType = null;
+        
+        // ライティングをデフォルトに戻す
+        this.ambientLight.intensity = 0.6;
+        this.directionalLight.intensity = 0.8;
+        this.fillLight.intensity = 0.3;
+        this.backLight.intensity = 0.2;
+        
+        // ライティングコントロールを非表示
+        document.getElementById('fbx-lighting').style.display = 'none';
+        document.getElementById('vrm-lighting').style.display = 'none';
+        
+        // BVH情報を非表示
+        document.getElementById('bvh-info').style.display = 'none';
+        
+        // コントロールを無効化
+        this.disableControls();
+    }
+    
+    displayBVHInfo() {
+        if (!this.motionData) return;
+        
+        const fps = (1.0 / this.motionData.frameTime).toFixed(1);
+        const frameCount = this.motionData.frameCount;
+        const duration = (frameCount * this.motionData.frameTime).toFixed(2);
+        
+        document.getElementById('fpsValue').textContent = fps;
+        document.getElementById('frameCountValue').textContent = frameCount;
+        document.getElementById('durationValue').textContent = duration + '秒';
+        document.getElementById('bvh-info').style.display = 'block';
+    }
+    
+    normalizeModel(model) {
+        // バウンディングボックスを計算
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        
+        // 適切なサイズにスケール
+        const maxDimension = Math.max(size.x, size.y, size.z);
+        const targetSize = 150;
+        const scale = targetSize / maxDimension;
+        
+        model.scale.setScalar(scale);
+        
+        // 中央に配置
+        model.position.x = -center.x * scale;
+        model.position.y = -center.y * scale;
+        model.position.z = -center.z * scale;
+        
+        console.log(`Model normalized: scale=${scale.toFixed(3)}, size=${maxDimension.toFixed(2)} → ${targetSize}`);
     }
     
     readFile(file) {
@@ -744,10 +1028,21 @@ class BVHViewer {
     
     
     enableControls() {
-        document.getElementById('playBtn').disabled = false;
-        document.getElementById('pauseBtn').disabled = false;
-        document.getElementById('resetBtn').disabled = false;
-        document.getElementById('speedControl').disabled = false;
+        // BVH以外ではアニメーションコントロールは無効
+        const hasAnimation = this.currentModelType === 'bvh' || 
+                           (this.mixer && this.mixer._actions.length > 0);
+        
+        document.getElementById('playBtn').disabled = !hasAnimation;
+        document.getElementById('pauseBtn').disabled = !hasAnimation;
+        document.getElementById('resetBtn').disabled = !hasAnimation;
+        document.getElementById('speedControl').disabled = !hasAnimation;
+    }
+    
+    disableControls() {
+        document.getElementById('playBtn').disabled = true;
+        document.getElementById('pauseBtn').disabled = true;
+        document.getElementById('resetBtn').disabled = true;
+        document.getElementById('speedControl').disabled = true;
     }
     
     play() {
@@ -773,29 +1068,31 @@ class BVHViewer {
     animate(currentTime = 0) {
         requestAnimationFrame((time) => this.animate(time));
         
-        if (this.isPlaying && this.motionData) {
+        if (this.isPlaying) {
             // 初回の場合、時間を初期化
             if (this.lastFrameTime === 0) {
                 this.lastFrameTime = currentTime;
             }
             
-            // 経過時間を計算
-            const deltaTime = (currentTime - this.lastFrameTime) * this.playSpeed;
+            const deltaTime = (currentTime - this.lastFrameTime) / 1000 * this.playSpeed;
             this.lastFrameTime = currentTime;
             
-            // BVHのフレーム時間（秒）をミリ秒に変換
-            const bvhFrameTimeMs = this.motionData.frameTime * 1000;
-            
-            // フレーム進行を時間ベースで計算
-            this.frameAccumulator += deltaTime;
-            
-            if (this.frameAccumulator >= bvhFrameTimeMs) {
-                // 次のフレームに進める
-                const framesToAdvance = Math.floor(this.frameAccumulator / bvhFrameTimeMs);
-                this.currentFrame = (this.currentFrame + framesToAdvance) % this.motionData.frameCount;
-                this.frameAccumulator -= framesToAdvance * bvhFrameTimeMs;
+            // BVHアニメーション
+            if (this.currentModelType === 'bvh' && this.motionData) {
+                const bvhFrameTimeMs = this.motionData.frameTime * 1000;
+                this.frameAccumulator += (currentTime - (this.lastFrameTime - deltaTime * 1000));
                 
-                this.updateFrame(Math.floor(this.currentFrame));
+                if (this.frameAccumulator >= bvhFrameTimeMs) {
+                    const framesToAdvance = Math.floor(this.frameAccumulator / bvhFrameTimeMs);
+                    this.currentFrame = (this.currentFrame + framesToAdvance) % this.motionData.frameCount;
+                    this.frameAccumulator -= framesToAdvance * bvhFrameTimeMs;
+                    this.updateFrame(Math.floor(this.currentFrame));
+                }
+            }
+            
+            // FBX/VRMアニメーション
+            if (this.mixer) {
+                this.mixer.update(deltaTime);
             }
         }
         
@@ -812,5 +1109,5 @@ class BVHViewer {
 
 // Initialize the viewer when the page loads
 window.addEventListener('DOMContentLoaded', () => {
-    new BVHViewer();
+    new ModelViewer();
 });

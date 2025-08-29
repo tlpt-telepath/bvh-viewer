@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BVH Viewer</title>
+    <title>3D Model Viewer</title>
     <style>
         * {
             margin: 0;
@@ -36,6 +36,39 @@
             color: #fff;
         }
 
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            background-color: #333;
+            border: none;
+            color: white;
+            border-radius: 4px 4px 0 0;
+            margin-right: 2px;
+            font-size: 14px;
+        }
+        
+        .tab.active {
+            background-color: #4a90e2;
+        }
+        
+        .tab:hover:not(.active) {
+            background-color: #444;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+
         .upload-area {
             border: 2px dashed #555;
             border-radius: 8px;
@@ -55,8 +88,14 @@
             background: rgba(74, 144, 226, 0.1);
         }
 
-        input[type="file"] {
+        .file-input {
             display: none;
+        }
+
+        .format-info {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 10px;
         }
 
         .controls {
@@ -120,23 +159,83 @@
 <body>
     <div class="container">
         <div class="sidebar">
-            <h1>BVH Viewer</h1>
+            <h1>3D Model Viewer</h1>
             
-            <div class="upload-area" id="uploadArea">
-                <p>BVHファイルをドラッグ&ドロップ<br>または<br>クリックして選択</p>
-                <input type="file" id="fileInput" accept=".bvh" />
+            <div class="tabs">
+                <button class="tab active" data-tab="bvh">BVH</button>
+                <button class="tab" data-tab="fbx">FBX</button>
+                <button class="tab" data-tab="vrm">VRM</button>
             </div>
-
-            <div class="controls">
-                <div class="control-group">
-                    <button id="playBtn" disabled>再生</button>
-                    <button id="pauseBtn" disabled>一時停止</button>
-                    <button id="resetBtn" disabled>リセット</button>
+            
+            <!-- BVH Tab -->
+            <div class="tab-content active" id="bvh-content">
+                <div class="upload-area" data-type="bvh">
+                    <p>クリックまたはドラッグ&ドロップで<br>BVHファイルをアップロード</p>
+                    <input type="file" class="file-input" accept=".bvh" />
+                    <div class="format-info">モーションキャプチャデータ（.bvh）</div>
                 </div>
                 
-                <div class="control-group">
-                    <label for="speedControl">再生速度: <span id="speedValue">1.0</span>x</label>
-                    <input type="range" id="speedControl" min="0.1" max="3" step="0.1" value="1" disabled />
+                <div class="bvh-info" id="bvh-info" style="display: none;">
+                    <div class="control-group">
+                        <label>FPS: <span id="fpsValue">-</span></label>
+                        <label>フレーム数: <span id="frameCountValue">-</span></label>
+                        <label>再生時間: <span id="durationValue">-</span></label>
+                    </div>
+                </div>
+                
+                <div class="controls">
+                    <div class="control-group">
+                        <button id="playBtn" disabled>再生</button>
+                        <button id="pauseBtn" disabled>一時停止</button>
+                        <button id="resetBtn" disabled>リセット</button>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="speedControl">再生速度: <span id="speedValue">1.0</span>x</label>
+                        <input type="range" id="speedControl" min="0.1" max="3" step="0.1" value="1" disabled />
+                    </div>
+                </div>
+            </div>
+            
+            <!-- FBX Tab -->
+            <div class="tab-content" id="fbx-content">
+                <div class="upload-area" data-type="fbx">
+                    <p>クリックまたはドラッグ&ドロップで<br>FBXファイルをアップロード</p>
+                    <input type="file" class="file-input" accept=".fbx" />
+                    <div class="format-info">3Dモデル（.fbx）</div>
+                </div>
+                
+                <div class="lighting-controls" id="fbx-lighting" style="display: none;">
+                    <div class="control-group">
+                        <label for="ambientIntensity">環境光: <span id="ambientValue">0.6</span></label>
+                        <input type="range" id="ambientIntensity" min="0" max="2" step="0.1" value="0.6" />
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="directionalIntensity">指向性ライト: <span id="directionalValue">0.8</span></label>
+                        <input type="range" id="directionalIntensity" min="0" max="3" step="0.1" value="0.8" />
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VRM Tab -->
+            <div class="tab-content" id="vrm-content">
+                <div class="upload-area" data-type="vrm">
+                    <p>クリックまたはドラッグ&ドロップで<br>VRMファイルをアップロード</p>
+                    <input type="file" class="file-input" accept=".vrm" />
+                    <div class="format-info">VRMアバター（.vrm）</div>
+                </div>
+                
+                <div class="lighting-controls" id="vrm-lighting" style="display: none;">
+                    <div class="control-group">
+                        <label for="ambientIntensityVrm">環境光: <span id="ambientValueVrm">0.6</span></label>
+                        <input type="range" id="ambientIntensityVrm" min="0" max="2" step="0.1" value="0.6" />
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="directionalIntensityVrm">指向性ライト: <span id="directionalValueVrm">0.8</span></label>
+                        <input type="range" id="directionalIntensityVrm" min="0" max="3" step="0.1" value="0.8" />
+                    </div>
                 </div>
             </div>
         </div>
