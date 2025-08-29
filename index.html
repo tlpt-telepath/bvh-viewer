@@ -28,45 +28,36 @@
             background: #2a2a2a;
             padding: 20px;
             border-right: 1px solid #444;
+            overflow-y: auto;
+            height: 100vh;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* カスタムスクロールバー */
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: #666;
         }
 
         h1 {
             font-size: 24px;
             margin-bottom: 20px;
             color: #fff;
-        }
-
-        .tabs {
-            display: flex;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #444;
-        }
-        
-        .tab {
-            padding: 10px 15px;
-            cursor: pointer;
-            background-color: #333;
-            border: none;
-            color: white;
-            border-radius: 4px 4px 0 0;
-            margin-right: 2px;
-            font-size: 14px;
-        }
-        
-        .tab.active {
-            background-color: #4a90e2;
-        }
-        
-        .tab:hover:not(.active) {
-            background-color: #444;
-        }
-        
-        .tab-content {
-            display: none;
-        }
-        
-        .tab-content.active {
-            display: block;
         }
 
         .upload-area {
@@ -88,8 +79,48 @@
             background: rgba(74, 144, 226, 0.1);
         }
 
-        .file-input {
+        #fileInput {
             display: none;
+        }
+        
+        .audio-upload-wrapper {
+            margin-bottom: 10px;
+        }
+        
+        .audio-upload-btn {
+            background: #4a90e2;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+        
+        .audio-upload-btn:hover {
+            background: #357abd;
+        }
+        
+        .audio-file-name {
+            display: block;
+            font-size: 11px;
+            color: #999;
+            text-align: center;
+            padding: 5px;
+            word-break: break-all;
+        }
+        
+        .audio-controls {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .audio-controls button {
+            flex: 1;
+            font-size: 12px;
+            padding: 6px 8px;
         }
 
         .format-info {
@@ -133,6 +164,78 @@
             cursor: not-allowed;
         }
 
+        select {
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .background-color-control {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+        
+        input[type="color"] {
+            flex: 1;
+            height: 40px;
+            border: 1px solid #666;
+            border-radius: 4px;
+            background: #444;
+            cursor: pointer;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        .reset-btn {
+            background: #666;
+            color: white;
+            border: none;
+            padding: 0 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            height: 40px;
+            white-space: nowrap;
+            min-width: 80px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .reset-btn:hover {
+            background: #777;
+        }
+        
+        .footer {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid #444;
+            text-align: center;
+        }
+        
+        .footer p {
+            font-size: 12px;
+            color: #888;
+            margin: 0;
+        }
+        
+        .footer a {
+            color: #4a90e2;
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            color: #357abd;
+            text-decoration: underline;
+        }
+
         .viewer {
             flex: 1;
             position: relative;
@@ -161,82 +264,104 @@
         <div class="sidebar">
             <h1>3D Model Viewer</h1>
             
-            <div class="tabs">
-                <button class="tab active" data-tab="bvh">BVH</button>
-                <button class="tab" data-tab="fbx">FBX</button>
-                <button class="tab" data-tab="vrm">VRM</button>
+            <div class="upload-area" id="uploadArea">
+                <p>3Dファイルをドラッグ&ドロップ<br>または<br>クリックして選択</p>
+                <p class="format-info">対応形式: BVH, FBX, VRM</p>
+                <input type="file" id="fileInput" accept=".bvh,.fbx,.vrm" />
             </div>
             
-            <!-- BVH Tab -->
-            <div class="tab-content active" id="bvh-content">
-                <div class="upload-area" data-type="bvh">
-                    <p>クリックまたはドラッグ&ドロップで<br>BVHファイルをアップロード</p>
-                    <input type="file" class="file-input" accept=".bvh" />
-                    <div class="format-info">モーションキャプチャデータ（.bvh）</div>
-                </div>
-                
-                <div class="bvh-info" id="bvh-info" style="display: none;">
-                    <div class="control-group">
-                        <label>FPS: <span id="fpsValue">-</span></label>
-                        <label>フレーム数: <span id="frameCountValue">-</span></label>
-                        <label>再生時間: <span id="durationValue">-</span></label>
-                    </div>
-                </div>
-                
-                <div class="controls">
-                    <div class="control-group">
-                        <button id="playBtn" disabled>再生</button>
-                        <button id="pauseBtn" disabled>一時停止</button>
-                        <button id="resetBtn" disabled>リセット</button>
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="speedControl">再生速度: <span id="speedValue">1.0</span>x</label>
-                        <input type="range" id="speedControl" min="0.1" max="3" step="0.1" value="1" disabled />
-                    </div>
+            <!-- BVH情報表示 -->
+            <div class="bvh-info" id="bvh-info" style="display: none;">
+                <div class="control-group">
+                    <label>FPS: <span id="fpsValue">-</span></label>
+                    <label>フレーム数: <span id="frameCountValue">-</span></label>
+                    <label>再生時間: <span id="durationValue">-</span></label>
                 </div>
             </div>
             
-            <!-- FBX Tab -->
-            <div class="tab-content" id="fbx-content">
-                <div class="upload-area" data-type="fbx">
-                    <p>クリックまたはドラッグ&ドロップで<br>FBXファイルをアップロード</p>
-                    <input type="file" class="file-input" accept=".fbx" />
-                    <div class="format-info">3Dモデル（.fbx）</div>
+            <!-- FBX/VRM情報表示 -->
+            <div class="model-info" id="model-info" style="display: none;">
+                <div class="control-group">
+                    <label>ファイル形式: <span id="modelTypeValue">-</span></label>
+                    <label>メッシュ数: <span id="meshCountValue">-</span></label>
+                    <label>アニメーション: <span id="animationStatusValue">-</span></label>
+                    <label id="perfectSyncLabel" style="display: none;">パーフェクトシンク: <span id="perfectSyncValue">-</span></label>
                 </div>
-                
-                <div class="lighting-controls" id="fbx-lighting" style="display: none;">
-                    <div class="control-group">
-                        <label for="ambientIntensity">環境光: <span id="ambientValue">0.6</span></label>
-                        <input type="range" id="ambientIntensity" min="0" max="2" step="0.1" value="0.6" />
-                    </div>
-                    
-                    <div class="control-group">
-                        <label for="directionalIntensity">指向性ライト: <span id="directionalValue">0.8</span></label>
-                        <input type="range" id="directionalIntensity" min="0" max="3" step="0.1" value="0.8" />
+            </div>
+            
+            <!-- 表示設定 -->
+            <div class="display-controls">
+                <div class="control-group">
+                    <label for="backgroundColor">背景色:</label>
+                    <div class="background-color-control">
+                        <input type="color" id="backgroundColor" value="#1a1a1a" />
+                        <button id="resetBackgroundBtn" class="reset-btn">デフォルト</button>
                     </div>
                 </div>
             </div>
             
-            <!-- VRM Tab -->
-            <div class="tab-content" id="vrm-content">
-                <div class="upload-area" data-type="vrm">
-                    <p>クリックまたはドラッグ&ドロップで<br>VRMファイルをアップロード</p>
-                    <input type="file" class="file-input" accept=".vrm" />
-                    <div class="format-info">VRMアバター（.vrm）</div>
+            <!-- ライティング調整 -->
+            <div class="lighting-controls" id="lighting-controls" style="display: none;">
+                <div class="control-group">
+                    <label for="ambientIntensity">環境光: <span id="ambientValue">0.6</span></label>
+                    <input type="range" id="ambientIntensity" min="0" max="2" step="0.1" value="0.6" />
                 </div>
                 
-                <div class="lighting-controls" id="vrm-lighting" style="display: none;">
-                    <div class="control-group">
-                        <label for="ambientIntensityVrm">環境光: <span id="ambientValueVrm">0.6</span></label>
-                        <input type="range" id="ambientIntensityVrm" min="0" max="2" step="0.1" value="0.6" />
+                <div class="control-group">
+                    <label for="directionalIntensity">指向性ライト: <span id="directionalValue">0.8</span></label>
+                    <input type="range" id="directionalIntensity" min="0" max="3" step="0.1" value="0.8" />
+                </div>
+            </div>
+            
+            <!-- VRM表情制御 -->
+            <div class="expression-controls" id="expression-controls" style="display: none;">
+                <div class="control-group">
+                    <label>表情プリセット:</label>
+                    <select id="expressionSelect">
+                        <option value="neutral">ニュートラル</option>
+                        <option value="happy">喜び</option>
+                        <option value="angry">怒り</option>
+                        <option value="sad">悲しみ</option>
+                        <option value="surprised">驚き</option>
+                        <option value="blink">まばたき</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label for="expressionWeight">表情の強さ: <span id="expressionWeightValue">0.0</span></label>
+                    <input type="range" id="expressionWeight" min="0" max="1" step="0.05" value="0" />
+                </div>
+                
+                <div class="control-group">
+                    <label>音声ファイル（リップシンク用）:</label>
+                    <div class="audio-upload-wrapper">
+                        <button class="audio-upload-btn" id="audioUploadBtn">音声ファイルを選択</button>
+                        <input type="file" id="audioInput" accept=".mp3,.wav,.ogg" style="display: none;" />
+                        <span class="audio-file-name" id="audioFileName">ファイルが選択されていません</span>
                     </div>
-                    
-                    <div class="control-group">
-                        <label for="directionalIntensityVrm">指向性ライト: <span id="directionalValueVrm">0.8</span></label>
-                        <input type="range" id="directionalIntensityVrm" min="0" max="3" step="0.1" value="0.8" />
+                    <div class="audio-controls">
+                        <button id="playAudioBtn" disabled>音声再生</button>
+                        <button id="stopAudioBtn" disabled>停止</button>
                     </div>
                 </div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <button id="playBtn" disabled>再生</button>
+                    <button id="pauseBtn" disabled>一時停止</button>
+                    <button id="resetBtn" disabled>リセット</button>
+                    <button id="resetCameraBtn">カメラリセット</button>
+                </div>
+                
+                <div class="control-group">
+                    <label for="speedControl">再生速度: <span id="speedValue">1.0</span>x</label>
+                    <input type="range" id="speedControl" min="0.1" max="3" step="0.1" value="1" disabled />
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p>made by <a href="https://x.com/tlpt_telepath" target="_blank" rel="noopener noreferrer">tlpt</a></p>
             </div>
         </div>
 
@@ -245,6 +370,7 @@
             <div class="info">
                 <div>マウスドラッグで回転</div>
                 <div>ホイールでズーム</div>
+                <div>ホイールクリック+ドラッグでパン</div>
             </div>
         </div>
     </div>
